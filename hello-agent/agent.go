@@ -46,6 +46,12 @@ func run(l Launcher, args []string) error {
 		return fmt.Errorf("failed to create model: %w", err)
 	}
 
+// API KEY Version of Model Call
+//  model, err := gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+//    APIKey: os.Getenv("GOOGLE_API_KEY"),
+//  })
+	
+
 	agent, err := llmagent.New(llmagent.Config{
 		Name:        agentName,
 		Model:       model,
