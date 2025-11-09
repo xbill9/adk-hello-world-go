@@ -32,4 +32,4 @@ COPY --from=build /hello-agent /app/hello-agent
 EXPOSE 8080
 
 # Run the application
-CMD ["/app/hello-agent"]
+CMD ["/app/hello-agent", "web", "-port", "8080", "api", "-webui_address", "127.0.0.1:8081", "a2a", "--a2a_agent_url", "http://127.0.0.1:8081", "webui", "--api_server_address", "http://127.0.0.1:8081/api"]
