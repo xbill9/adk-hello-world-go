@@ -16,4 +16,3 @@ web.sh          Web Based UI
 webvm.sh        Web Based UI with all interfaces open
 
 cloudrun.sh     Build and deploy the Go Cloud Run Agent
-api_server.sh   Run the Go Agent in API mode
