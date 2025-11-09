@@ -15,5 +15,5 @@ run.sh          Command Line interaction with Agent
 web.sh          Web Based UI 
 webvm.sh        Web Based UI with all interfaces open
 
-cloudrun.sh     Build out Cloud Run deployment of Agent
-api_server.sh   Run Agent in API mode
+cloudrun.sh     Build and deploy the Go Cloud Run Agent
+api_server.sh   Run the Go Agent in API mode
