@@ -1,6 +1,6 @@
-module hello-agent/main
+module hello-agent
 
-go 1.25.4
+go 1.24.4
 
 require (
 	google.golang.org/adk v0.1.0

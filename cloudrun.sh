@@ -1,24 +1,13 @@
 source $HOME/adk-hello-world-go/set_env.sh
 
-cd hello-agent
 
 echo `pwd`
 echo go run agent.go deploy
-go run agent.go deploy
 
-echo adk deploy cloud_run \
---project=$GOOGLE_CLOUD_PROJECT \
---region=$GOOGLE_CLOUD_LOCATION \
---service_name=$SERVICE_NAME \
---app_name=$APP_NAME \
---with_ui \
-$AGENT_PATH
+#--set-env-vars GOOGLE_CLOUD_PROJECT=comglitn,GOOGLE_CLOUD_LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=true    
 
-
-adk deploy cloud_run \
---project=$GOOGLE_CLOUD_PROJECT \
---region=$GOOGLE_CLOUD_LOCATION \
---service_name=$SERVICE_NAME \
---app_name=$APP_NAME \
---with_ui \
-$AGENT_PATH
+$HOME/adk-go/adkgo deploy cloudrun \
+    -p $GOOGLE_CLOUD_PROJECT \
+    -r $GOOGLE_CLOUD_LOCATION \
+    -s $SERVICE_NAME \
+    -e $AGENT_PATH 

@@ -80,9 +80,9 @@ export SERVICE_NAME="adk-hello-world-go"
 # Set an application name (optional)
 export APP_NAME="adk-hello-world-go"
 
-#export AGENT_PATH="$HOME/adk-hello-world/src/agents/adk_hello_world"
+export AGENT_PATH="./hello-agent/agent.go"
 
-#echo "Exported AGENT_PATH=$AGENT_PATH"
+echo "Exported AGENT_PATH=$AGENT_PATH"
 
 echo "--- Environment setup complete ---"
 

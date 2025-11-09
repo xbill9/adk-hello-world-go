@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -15,18 +16,38 @@ import (
 	"google.golang.org/genai"
 )
 
+// Launcher is an interface for executing the ADK launcher.
+type Launcher interface {
+	Execute(ctx context.Context, config *adk.Config, args []string) error
+	CommandLineSyntax() string
+}
+
 func main() {
+	if err := run(full.NewLauncher(), os.Args[1:]); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(l Launcher, args []string) error {
 	ctx := context.Background()
 
-	model, err := gemini.NewModel(ctx, "gemini-2.5-flash", &genai.ClientConfig{
-		//    APIKey: os.Getenv("GOOGLE_API_KEY"),
-	})
+	modelName := os.Getenv("GEMINI_MODEL")
+	if modelName == "" {
+		modelName = "gemini-2.5-flash"
+	}
+
+	agentName := os.Getenv("ADK_AGENT_NAME")
+	if agentName == "" {
+		agentName = "hello_time_agent"
+	}
+
+	model, err := gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
 	if err != nil {
-		log.Fatalf("Failed to create model: %v", err)
+		return fmt.Errorf("failed to create model: %w", err)
 	}
 
 	agent, err := llmagent.New(llmagent.Config{
-		Name:        "hello_time_agent",
+		Name:        agentName,
 		Model:       model,
 		Description: "Tells the current time in a specified city.",
 		Instruction: "You are a helpful assistant that tells the current time in a city.",
@@ -35,16 +56,15 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatalf("Failed to create agent: %v", err)
+		return fmt.Errorf("failed to create agent: %w", err)
 	}
 
 	config := &adk.Config{
 		AgentLoader: services.NewSingleAgentLoader(agent),
 	}
 
-	l := full.NewLauncher()
-	err = l.Execute(ctx, config, os.Args[1:])
-	if err != nil {
-		log.Fatalf("run failed: %v\n\n%s", err, l.CommandLineSyntax())
+	if err := l.Execute(ctx, config, args); err != nil {
+		return fmt.Errorf("run failed: %w\n\n%s", err, l.CommandLineSyntax())
 	}
+	return nil
 }
