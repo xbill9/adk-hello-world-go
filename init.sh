@@ -72,10 +72,7 @@ else
     gcloud config set project $(cat ~/project_id.txt)
 
     # Check for application default credentials
-    if [ ! -f "$HOME/.config/gcloud/application_default_credentials.json" ]; then
-        echo "Google Cloud Application Default Credentials not found. Please log in."
         gcloud auth application-default login
-    fi
 fi
 
 export PATH=$PATH:$HOME/.local/bin
