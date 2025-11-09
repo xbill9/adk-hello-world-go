@@ -1,6 +1,8 @@
 
 source $HOME/adk-hello-world-go/set_env.sh
 
+echo PROXY URL http://127.0.0.1:8081/ui/?app=hello_time_agent
+
 if ss -ltn | grep -q :8081; then
   echo "Proxy is already running at http://127.0.0.1:8081/ui/?app=hello_time_agent"
 else
