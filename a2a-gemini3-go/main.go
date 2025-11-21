@@ -5,38 +5,65 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 
+	"google.golang.org/adk/agent"
+	"google.golang.org/adk/model"
 	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/cmd/launcher/adk"
+	"google.golang.org/adk/cmd/launcher"
 	"google.golang.org/adk/cmd/launcher/full"
 	"google.golang.org/adk/model/gemini"
-	"google.golang.org/adk/server/restapi/services"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/geminitool"
 	"google.golang.org/genai"
 )
 
+const (
+	defaultModelName = "gemini-3-pro-preview"
+	agentName        = "hello_time_agent"
+)
+
 func main() {
-	ctx := context.Background()
+	// Handle signal interrupts (Ctrl+C) gracefully.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 
-	modelName := os.Getenv("GEMINI_MODEL")
+	if err := run(ctx); err != nil {
+		// log.Fatal calls os.Exit(1), preventing defers from running.
+		// Since we are at the end of main, it's acceptable here,
+		// but using 'run' allows earlier defers (like cancel) to execute if we returned an error.
+		log.Fatalf("Application failed: %v", err)
+	}
+}
+
+func run(ctx context.Context) error {
+	log.Println("Starting application...")
+
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	modelName := os.Getenv("MODEL_NAME")
 	if modelName == "" {
-		modelName = "gemini-3-pro-preview"
+		modelName = defaultModelName
 	}
 
-	agentName := os.Getenv("ADK_AGENT_NAME")
-	if agentName == "" {
-		agentName = "a2a-gemini3-go"
-	}
+	log.Printf("Initializing model %q...", modelName)
 
-	model, err := gemini.NewModel(ctx, modelName, &genai.ClientConfig{
-		APIKey: os.Getenv("GOOGLE_API_KEY"),
-	})
+	var model model.LLM
+	var err error
+	// use API KEY if set but otherwise Vertex AI
+	if apiKey != "" {
+		log.Println("Using Google API Key for authentication")
+		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+			APIKey: apiKey,
+		})
+	} else {
+		log.Println("Using Vertex AI (default credentials) for authentication")
+		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
+	}
 	if err != nil {
-		log.Fatalf("Failed to create Gemini model: %v", err)
+		return fmt.Errorf("failed to create model: %w", err)
 	}
 
-	agent, err := llmagent.New(llmagent.Config{
+	ag, err := llmagent.New(llmagent.Config{
 		Name:        agentName,
 		Model:       model,
 		Description: "Tells the current time in a specified city.",
@@ -46,10 +73,40 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatalf("failed to create agent: %v", err)
+		return fmt.Errorf("failed to create agent: %w", err)
+	}
+	log.Printf("Agent %q created successfully", agentName)
+
+	config := &launcher.Config{
+		AgentLoader: &singleAgentLoader{agent: ag},
 	}
 
-	if err := adk.Launch(ctx, full.New(services.NewAgentService(agent))); err != nil {
-		log.Fatalf("ADK launcher failed: %v", err)
+	l := full.NewLauncher()
+	log.Println("Starting launcher...")
+	// Pass the signal-aware context to the launcher.
+	if err := l.Execute(ctx, config, os.Args[1:]); err != nil {
+		return fmt.Errorf("launcher execution failed: %w\n\nUsage:\n%s", err, l.CommandLineSyntax())
 	}
+
+	return nil
+}
+
+// singleAgentLoader adapts a single agent instance to the AgentLoader interface.
+type singleAgentLoader struct {
+	agent agent.Agent
+}
+
+func (s *singleAgentLoader) ListAgents() []string {
+	return []string{s.agent.Name()}
+}
+
+func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
+	if name == s.agent.Name() {
+		return s.agent, nil
+	}
+	return nil, nil
+}
+
+func (s *singleAgentLoader) RootAgent() agent.Agent {
+	return s.agent
 }

@@ -14,13 +14,13 @@ all: build
 # Build the project for development
 build:
 	@echo "Building the Go project..."
-	@cd $(APP_DIR) && go get -u ./... && go mod tidy
+	@cd $(APP_DIR) && go mod tidy
 	@cd $(APP_DIR) && go build .
 
 # Run the project
 run:
 	@echo "Running the Go project..."
-	@cd $(APP_DIR) &&  go run agent.go
+	@cd $(APP_DIR) &&  go run main.go
 
 # Clean the project
 clean:
