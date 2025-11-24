@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 
 	"google.golang.org/adk/agent"
-	"google.golang.org/adk/model"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/cmd/launcher"
 	"google.golang.org/adk/cmd/launcher/full"
+	"google.golang.org/adk/model"
 	"google.golang.org/adk/model/gemini"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/geminitool"
@@ -29,15 +29,17 @@ func main() {
 	defer cancel()
 
 	if err := run(ctx); err != nil {
-		// log.Fatal calls os.Exit(1), preventing defers from running.
-		// Since we are at the end of main, it's acceptable here,
-		// but using 'run' allows earlier defers (like cancel) to execute if we returned an error.
-		log.Fatalf("Application failed: %v", err)
+		// slog.Error does not exit, so we use os.Exit(1) after logging.
+		// Since we are at the end of main, defers in run() have already executed.
+		slog.Error("Application failed", "error", err)
+		os.Exit(1)
 	}
 }
 
+// run executes the main application logic.
+// It initializes the model, creates the agent, and starts the launcher.
 func run(ctx context.Context) error {
-	log.Println("Starting application...")
+	slog.Info("Starting application...")
 
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	modelName := os.Getenv("MODEL_NAME")
@@ -45,18 +47,18 @@ func run(ctx context.Context) error {
 		modelName = defaultModelName
 	}
 
-	log.Printf("Initializing model %q...", modelName)
+	slog.Info("Initializing model", "model", modelName)
 
 	var model model.LLM
 	var err error
 	// use API KEY if set but otherwise Vertex AI
 	if apiKey != "" {
-		log.Println("Using Google API Key for authentication")
+		slog.Info("Using Google API Key for authentication")
 		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			APIKey: apiKey,
 		})
 	} else {
-		log.Println("Using Vertex AI (default credentials) for authentication")
+		slog.Info("Using Vertex AI (default credentials) for authentication")
 		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
 	}
 	if err != nil {
@@ -75,14 +77,14 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create agent: %w", err)
 	}
-	log.Printf("Agent %q created successfully", agentName)
+	slog.Info("Agent created successfully", "agent", agentName)
 
 	config := &launcher.Config{
 		AgentLoader: &singleAgentLoader{agent: ag},
 	}
 
 	l := full.NewLauncher()
-	log.Println("Starting launcher...")
+	slog.Info("Starting launcher...")
 	// Pass the signal-aware context to the launcher.
 	if err := l.Execute(ctx, config, os.Args[1:]); err != nil {
 		return fmt.Errorf("launcher execution failed: %w\n\nUsage:\n%s", err, l.CommandLineSyntax())
@@ -92,14 +94,18 @@ func run(ctx context.Context) error {
 }
 
 // singleAgentLoader adapts a single agent instance to the AgentLoader interface.
+// It is used to provide a simple loader that always returns the same agent.
 type singleAgentLoader struct {
 	agent agent.Agent
 }
 
+// ListAgents returns a list of available agent names.
 func (s *singleAgentLoader) ListAgents() []string {
 	return []string{s.agent.Name()}
 }
 
+// LoadAgent retrieves an agent by name.
+// It returns the stored agent if the name matches, otherwise nil.
 func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
 	if name == s.agent.Name() {
 		return s.agent, nil
@@ -107,6 +113,7 @@ func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
 	return nil, nil
 }
 
+// RootAgent returns the default or root agent for this loader.
 func (s *singleAgentLoader) RootAgent() agent.Agent {
 	return s.agent
 }
