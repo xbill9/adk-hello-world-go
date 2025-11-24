@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 
@@ -24,20 +24,23 @@ const (
 )
 
 func main() {
+	// Configure structured logging (JSON) for Cloud Logging compatibility.
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	slog.SetDefault(logger)
+
 	// Handle signal interrupts (Ctrl+C) gracefully.
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	if err := run(ctx); err != nil {
-		// log.Fatal calls os.Exit(1), preventing defers from running.
-		// Since we are at the end of main, it's acceptable here,
-		// but using 'run' allows earlier defers (like cancel) to execute if we returned an error.
-		log.Fatalf("Application failed: %v", err)
+		// slog.Error doesn't exit, so we handle it explicitly.
+		slog.Error("Application failed", "error", err)
+		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context) error {
-	log.Println("Starting application...")
+	slog.Info("Starting application")
 
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	modelName := os.Getenv("MODEL_NAME")
@@ -45,18 +48,18 @@ func run(ctx context.Context) error {
 		modelName = defaultModelName
 	}
 
-	log.Printf("Initializing model %q...", modelName)
+	slog.Info("Initializing model", "model", modelName)
 
 	var model model.LLM
 	var err error
 	// use API KEY if set but otherwise Vertex AI
 	if apiKey != "" {
-		log.Println("Using Google API Key for authentication")
+		slog.Info("Using Google API Key for authentication")
 		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			APIKey: apiKey,
 		})
 	} else {
-		log.Println("Using Vertex AI (default credentials) for authentication")
+		slog.Info("Using Vertex AI (default credentials) for authentication")
 		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
 	}
 	if err != nil {
@@ -75,14 +78,14 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create agent: %w", err)
 	}
-	log.Printf("Agent %q created successfully", agentName)
+	slog.Info("Agent created successfully", "agent", agentName)
 
 	config := &launcher.Config{
 		AgentLoader: &singleAgentLoader{agent: ag},
 	}
 
 	l := full.NewLauncher()
-	log.Println("Starting launcher...")
+	slog.Info("Starting launcher")
 	// Pass the signal-aware context to the launcher.
 	if err := l.Execute(ctx, config, os.Args[1:]); err != nil {
 		return fmt.Errorf("launcher execution failed: %w\n\nUsage:\n%s", err, l.CommandLineSyntax())
