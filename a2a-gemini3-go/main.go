@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/cmd/launcher"
-	"google.golang.org/adk/cmd/launcher/full"
+	"google.golang.org/adk/cmd/launcher/prod"
 	"google.golang.org/adk/model"
 	"google.golang.org/adk/model/gemini"
+	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/geminitool"
 	"google.golang.org/genai"
@@ -59,7 +62,11 @@ func run(ctx context.Context) error {
 		})
 	} else {
 		slog.Info("Using Vertex AI (default credentials) for authentication")
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
+		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+			Project:  os.Getenv("GOOGLE_CLOUD_PROJECT"),
+			Location: os.Getenv("GOOGLE_CLOUD_LOCATION"),
+			Backend:  genai.BackendVertexAI,
+		})
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create model: %w", err)
@@ -68,8 +75,8 @@ func run(ctx context.Context) error {
 	ag, err := llmagent.New(llmagent.Config{
 		Name:        agentName,
 		Model:       model,
-		Description: "Tells the current time in a specified city.",
-		Instruction: "You are a helpful assistant that tells the current time in a city.",
+		Description: "Tells the current time in a specified city by searching on Google.",
+		Instruction: "You are a helpful assistant that tells the current time in a city using Google Search. You cannot set the time.",
 		Tools: []tool.Tool{
 			geminitool.GoogleSearch{},
 		},
@@ -80,13 +87,43 @@ func run(ctx context.Context) error {
 	slog.Info("Agent created successfully", "agent", agentName)
 
 	config := &launcher.Config{
-		AgentLoader: &singleAgentLoader{agent: ag},
+		AgentLoader:    &singleAgentLoader{agent: ag},
+		SessionService: session.InMemoryService(),
 	}
 
-	l := full.NewLauncher()
+        	// Allow PORT to be set by the environment
+        	portStr := os.Getenv("PORT")
+        	if portStr == "" {
+        		portStr = "8095"
+        	}
+        
+        	port, err := strconv.Atoi(portStr)
+        	if err != nil {
+        		slog.Warn("Invalid PORT environment variable, defaulting to 8095", "error", err)
+        		port = 8095
+        	}
+        
+        	// Check if the port is available, if not find the next available one
+        	finalPort := findAvailablePort(port)
+        	if finalPort != port {
+        		slog.Info("Port was busy, switching to available port", "old_port", port, "new_port", finalPort)
+        		portStr = strconv.Itoa(finalPort)
+        	}
+        
+        	// Set PORT env var for the launcher to pick up
+        	os.Setenv("PORT", portStr)
+
+       args := []string{
+                "web", // Launch web server
+                "--port", portStr,
+                "a2a", // Sublauncher for a2a functionality
+                "--a2a_agent_url", "http://0.0.0.0:" + portStr,
+        }
+
+	l := prod.NewLauncher()
 	slog.Info("Starting launcher...")
 	// Pass the signal-aware context to the launcher.
-	if err := l.Execute(ctx, config, os.Args[1:]); err != nil {
+	if err := l.Execute(ctx, config, args); err != nil {
 		return fmt.Errorf("launcher execution failed: %w\n\nUsage:\n%s", err, l.CommandLineSyntax())
 	}
 
@@ -116,4 +153,17 @@ func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
 // RootAgent returns the default or root agent for this loader.
 func (s *singleAgentLoader) RootAgent() agent.Agent {
 	return s.agent
+}
+
+// findAvailablePort attempts to find an available port starting from the given port.
+// It returns the first available port it finds, or the original port if checking fails.
+func findAvailablePort(startPort int) int {
+	for port := startPort; port < startPort+100; port++ {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err == nil {
+			ln.Close()
+			return port
+		}
+	}
+	return startPort // Fallback to original if no port found in range
 }
