@@ -25,7 +25,11 @@ const (
 
 func main() {
 	// Configure structured logging (JSON) for Cloud Logging compatibility.
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	// Enable AddSource to include file and line number.
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, opts))
 	slog.SetDefault(logger)
 
 	// Handle signal interrupts (Ctrl+C) gracefully.
