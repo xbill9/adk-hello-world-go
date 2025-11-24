@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"strings"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -43,7 +45,7 @@ func rollDieTool(tc tool.Context, args rollDieToolArgs) (int, error) {
 	return rand.Intn(args.Sides) + 1, nil
 }
 
-func newRollAgent(ctx context.Context) (agent.Agent, error) {
+func newRollAgent(ctx context.Context, modelName string) (agent.Agent, error) {
 	rollTool, err := functiontool.New(functiontool.Config{
 		Name:        "roll_die",
 		Description: "Roll a die and return the rolled result.",
@@ -52,7 +54,7 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 		return nil, fmt.Errorf("failed to create roll_die tool: %w", err)
 	}
 
-	model, err := gemini.NewModel(ctx, "gemini-2.5-flash", &genai.ClientConfig{})
+	model, err := gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model for roll agent: %w", err)
 	}
@@ -69,11 +71,11 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 // --- Remote Prime Agent ---
 
 // --8<-- [start:new-prime-agent]
-func newPrimeAgent() (agent.Agent, error) {
+func newPrimeAgent(primeAgentURL string) (agent.Agent, error) {
 	remoteAgent, err := remoteagent.NewA2A(remoteagent.A2AConfig{
 		Name:            "prime_agent",
 		Description:     "Agent that handles checking if numbers are prime.",
-		AgentCardSource: "http://localhost:8086",
+		AgentCardSource: primeAgentURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote prime agent: %w", err)
@@ -86,8 +88,8 @@ func newPrimeAgent() (agent.Agent, error) {
 // --- Root Agent ---
 
 // --8<-- [start:new-root-agent]
-func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent.Agent, error) {
-	model, err := gemini.NewModel(ctx, "gemini-2.5-flash", &genai.ClientConfig{})
+func newRootAgent(ctx context.Context, modelName string, rollAgent, primeAgent agent.Agent) (agent.Agent, error) {
+	model, err := gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -115,17 +117,37 @@ func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent
 func main() {
 	ctx := context.Background()
 
-	primeAgent, err := newPrimeAgent()
+	modelName := os.Getenv("ADK_MODEL_NAME")
+	if modelName == "" {
+		modelName = "gemini-2.5-flash"
+	}
+
+	primeAgentURL := os.Getenv("ADK_PRIME_AGENT_URL")
+	if primeAgentURL == "" {
+		primeAgentURL = "http://localhost:8086"
+	}
+
+	userID := os.Getenv("ADK_USER_ID")
+	if userID == "" {
+		userID = "user-123"
+	}
+
+	sessionID := os.Getenv("ADK_SESSION_ID")
+	if sessionID == "" {
+		sessionID = "session-abc"
+	}
+
+	primeAgent, err := newPrimeAgent(primeAgentURL)
 	if err != nil {
 		log.Fatalf("Failed to create prime agent: %v", err)
 	}
 
-	rollAgent, err := newRollAgent(ctx)
+	rollAgent, err := newRollAgent(ctx, modelName)
 	if err != nil {
 		log.Fatalf("Failed to create roll agent: %v", err)
 	}
 
-	rootAgent, err := newRootAgent(ctx, rollAgent, primeAgent)
+	rootAgent, err := newRootAgent(ctx, modelName, rollAgent, primeAgent)
 	if err != nil {
 		log.Fatalf("Failed to create root agent: %v", err)
 	}
@@ -135,8 +157,8 @@ func main() {
 
 	_, err = sessionService.Create(ctx, &session.CreateRequest{
 		AppName:   rootAgent.Name(),
-		UserID:    "user-123",
-		SessionID: "session-abc",
+		UserID:    userID,
+		SessionID: sessionID,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create session: %v", err)
@@ -153,11 +175,16 @@ func main() {
 		log.Fatalf("Failed to create runner: %v", err)
 	}
 
-	userInput := "Roll a 6-sided die and check if it's prime."
+	var userInput string
+	if len(os.Args) > 1 {
+		userInput = strings.Join(os.Args[1:], " ")
+	} else {
+		userInput = "Roll a 6-sided die and check if it's prime."
+	}
 	fmt.Printf("User: %s\n", userInput)
 
 	inputContent := genai.NewContentFromText(userInput, genai.RoleUser)
-	for event, err := range runner.Run(ctx, "user-123", "session-abc", inputContent, agent.RunConfig{
+	for event, err := range runner.Run(ctx, userID, sessionID, inputContent, agent.RunConfig{
 		StreamingMode: agent.StreamingModeNone,
 	}) {
 		if err != nil {
