@@ -36,23 +36,18 @@ func TestIsPrime(t *testing.T) {
 func TestCheckPrimeTool(t *testing.T) {
 	tests := []struct {
 		name           string
-		nums           []int
+		num            int
 		expectedSubstr string
 	}{
 		{
 			name:           "NoPrimes",
-			nums:           []int{4, 6, 8},
-			expectedSubstr: "No prime numbers found",
+			num:            4,
+			expectedSubstr: "4 is not a prime number",
 		},
 		{
-			name:           "SomePrimes",
-			nums:           []int{4, 5, 7},
-			expectedSubstr: "5, 7 are prime numbers",
-		},
-		{
-			name:           "Mixed",
-			nums:           []int{2, 10, 11},
-			expectedSubstr: "2, 11 are prime numbers",
+			name:           "Prime",
+			num:            5,
+			expectedSubstr: "5 is a prime number",
 		},
 	}
 
@@ -60,7 +55,7 @@ func TestCheckPrimeTool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// checkPrimeTool doesn't use tool.Context, so we can pass nil
 			var tc tool.Context = nil
-			args := checkPrimeToolArgs{Nums: tt.nums}
+			args := checkPrimeToolArgs{Num: tt.num}
 
 			got, err := checkPrimeTool(tc, args)
 			if err != nil {

@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
-	"strings"
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -47,24 +45,14 @@ func isPrime(n int) bool {
 }
 
 type checkPrimeToolArgs struct {
-	Nums []int `json:"nums" jsonschema:"A list of numbers to check for primality."`
+	Num int `json:"num" jsonschema:"A number to check for primality."`
 }
 
 func checkPrimeTool(tc tool.Context, args checkPrimeToolArgs) (string, error) {
-	var primes []int
-	for _, num := range args.Nums {
-		if isPrime(num) {
-			primes = append(primes, num)
-		}
+	if isPrime(args.Num) {
+		return fmt.Sprintf("%d is a prime number.", args.Num), nil
 	}
-	if len(primes) == 0 {
-		return "No prime numbers found.", nil
-	}
-	var primeStrings []string
-	for _, p := range primes {
-		primeStrings = append(primeStrings, strconv.Itoa(p))
-	}
-	return fmt.Sprintf("%s are prime numbers.", strings.Join(primeStrings, ", ")), nil
+	return fmt.Sprintf("%d is not a prime number.", args.Num), nil
 }
 
 // SingleAgentLoader is a simple implementation of agent.Loader for a single agent.
@@ -96,7 +84,7 @@ func main() {
 
 	primeTool, err := functiontool.New(functiontool.Config{
 		Name:        "prime_checking",
-		Description: "Check if numbers in a list are prime using efficient mathematical algorithms",
+		Description: "Check if a number is prime using efficient mathematical algorithms",
 	}, checkPrimeTool)
 	if err != nil {
 		slog.Error("Failed to create prime_checking tool", "error", err)
@@ -111,10 +99,10 @@ func main() {
 
 	primeAgent, err := llmagent.New(llmagent.Config{
 		Name:        "check_prime_agent",
-		Description: "check prime agent that can check whether numbers are prime.",
+		Description: "check prime agent that can check whether a number is prime.",
 		Instruction: `
-			You check whether numbers are prime.
-			When checking prime numbers, call the check_prime tool with a list of integers. Be sure to pass in a list of integers. You should never pass in a string.
+			You check whether a number is prime.
+			When checking if a number is prime, call the check_prime tool with a single integer.
 			You should not rely on the previous history on prime results.
     `,
 		Model: model,
