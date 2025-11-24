@@ -81,7 +81,7 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 func newPrimeAgent() (agent.Agent, error) {
 	remoteAgent, err := remoteagent.NewA2A(remoteagent.A2AConfig{
 		Name:            PrimeAgentName,
-		Description:     "Agent that handles checking if numbers are prime.",
+		Description:     "Agent that handles checking if a single integer is prime.",
 		AgentCardSource: "http://localhost:8086",
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent
       You delegate rolling dice tasks to the roll_agent and prime checking tasks to the prime_agent.
       Follow these steps:
       1. If the user asks to roll a die, delegate to the roll_agent.
-      2. If the user asks to check primes, delegate to the prime_agent.
+      2. If the user asks to check primes, delegate to the prime_agent with a single integer.
       3. If the user asks to roll a die and then check if the result is prime, call roll_agent first, then pass the result to prime_agent.
       Always clarify the results before proceeding.
     `,
