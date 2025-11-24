@@ -17,28 +17,28 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
+	"os"
 	"strconv"
-
 
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/agent/remoteagent"
-	adkservices "google.golang.org/adk/server/restapi/services"
-
+	"google.golang.org/adk/cmd/launcher"
+	"google.golang.org/adk/cmd/launcher/prod"
 	"google.golang.org/adk/model/gemini"
-
 	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
-
-        "google.golang.org/adk/cmd/launcher/adk"
-        "google.golang.org/adk/cmd/launcher/web"
-        "google.golang.org/adk/cmd/launcher/web/a2a"
-        
-
 	"google.golang.org/genai"
+)
+
+const (
+	RollAgentName  = "roll_agent"
+	PrimeAgentName = "prime_agent"
+	RootAgentName  = "root_agent"
+	GeminiModel    = "gemini-2.5-flash"
 )
 
 // --- Local Roll Agent ---
@@ -47,8 +47,9 @@ type rollDieToolArgs struct {
 	Sides int `json:"sides" jsonschema:"The number of sides on the die."`
 }
 
-func rollDieTool(tc tool.Context, args rollDieToolArgs) int {
-	return rand.Intn(args.Sides) + 1
+func rollDieTool(tc tool.Context, args rollDieToolArgs) (string, error) {
+	result := rand.Intn(args.Sides) + 1
+	return strconv.Itoa(result), nil
 }
 
 func newRollAgent(ctx context.Context) (agent.Agent, error) {
@@ -60,13 +61,13 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 		return nil, fmt.Errorf("failed to create roll_die tool: %w", err)
 	}
 
-	model, err := gemini.NewModel(ctx, "gemini-2.5-flash", &genai.ClientConfig{})
+	model, err := gemini.NewModel(ctx, GeminiModel, &genai.ClientConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model for roll agent: %w", err)
 	}
 
 	return llmagent.New(llmagent.Config{
-		Name:        "roll_agent",
+		Name:        RollAgentName,
 		Description: "Handles rolling dice of different sizes.",
 		Instruction: "You are responsible for rolling dice based on the user's request. When asked to roll a die, you must call the roll_die tool with the number of sides as an integer.",
 		Model:       model,
@@ -78,8 +79,8 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 
 // --8<-- [start:new-prime-agent]
 func newPrimeAgent() (agent.Agent, error) {
-	remoteAgent, err := remoteagent.New(remoteagent.A2AConfig{
-		Name:            "prime_agent",
+	remoteAgent, err := remoteagent.NewA2A(remoteagent.A2AConfig{
+		Name:            PrimeAgentName,
 		Description:     "Agent that handles checking if numbers are prime.",
 		AgentCardSource: "http://localhost:8086",
 	})
@@ -95,12 +96,12 @@ func newPrimeAgent() (agent.Agent, error) {
 
 // --8<-- [start:new-root-agent]
 func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent.Agent, error) {
-	model, err := gemini.NewModel(ctx, "gemini-2.0-flash", &genai.ClientConfig{})
+	model, err := gemini.NewModel(ctx, GeminiModel, &genai.ClientConfig{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create model for root agent: %w", err)
 	}
 	return llmagent.New(llmagent.Config{
-		Name:  "root_agent",
+		Name:  RootAgentName,
 		Model: model,
 		Instruction: `
       You are a helpful assistant that can roll dice and check if numbers are prime.
@@ -120,24 +121,50 @@ func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent
 
 // --8<-- [end:new-root-agent]
 
+// SingleAgentLoader is a simple implementation of agent.Loader for a single agent.
+type SingleAgentLoader struct {
+	Agent agent.Agent
+}
+
+func (l *SingleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
+	if name == l.Agent.Name() {
+		return l.Agent, nil
+	}
+	return nil, fmt.Errorf("agent not found: %s", name)
+}
+
+func (l *SingleAgentLoader) ListAgents() []string {
+	return []string{l.Agent.Name()}
+}
+
+func (l *SingleAgentLoader) RootAgent() agent.Agent {
+	return l.Agent
+}
+
 // --- Main Function ---
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	ctx := context.Background()
 
 	primeAgent, err := newPrimeAgent()
 	if err != nil {
-		log.Fatalf("Failed to create prime agent: %v", err)
+		slog.Error("Failed to create prime agent", "error", err)
+		os.Exit(1)
 	}
 
 	rollAgent, err := newRollAgent(ctx)
 	if err != nil {
-		log.Fatalf("Failed to create roll agent: %v", err)
+		slog.Error("Failed to create roll agent", "error", err)
+		os.Exit(1)
 	}
 
 	rootAgent, err := newRootAgent(ctx, rollAgent, primeAgent)
 	if err != nil {
-		log.Fatalf("Failed to create root agent: %v", err)
+		slog.Error("Failed to create root agent", "error", err)
+		os.Exit(1)
 	}
 
 	sessionService := session.InMemoryService()
@@ -148,32 +175,39 @@ func main() {
 		SessionID: "session-abc",
 	})
 	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
+		slog.Error("Failed to create session", "error", err)
+		os.Exit(1)
 	}
 
+	// Create launcher.
+	l := prod.NewLauncher()
 
+	// Allow PORT to be set by the environment (e.g., Cloud Run), default to 8092
+	portStr := os.Getenv("PORT")
+	if portStr == "" {
+		portStr = "8092"
+	}
+	// Set PORT env var for the launcher to pick up
+	os.Setenv("PORT", portStr)
 
-        port := 8092
-        launcher := web.NewLauncher(a2a.NewLauncher())
-        _, parseErr := launcher.Parse([]string{
-                "--port", strconv.Itoa(port),
-                "a2a", "--a2a_agent_url", "http://0.0.0.0:" + strconv.Itoa(port),
-        })
-        if parseErr != nil {
-                log.Fatalf("launcher.Parse() error = %v", parseErr)
-        }
+	// Create ADK config
+	config := &launcher.Config{
+		AgentLoader:    &SingleAgentLoader{Agent: rootAgent},
+		SessionService: sessionService,
+	}
 
-        // Create ADK config
-        config := &adk.Config{
-                AgentLoader:    adkservices.NewSingleAgentLoader(rootAgent),
-                SessionService: session.InMemoryService(),
-        }
+	slog.Info("Starting A2A prime checker server", "port", portStr)
 
-        log.Printf("Starting A2A prime checker server on port %d\n", port)
-        // Run launcher
-        if err := launcher.Run(context.Background(), config); err != nil {
-                log.Fatalf("launcher.Run() error = %v", err)
-        }
+	// Arguments for the launcher.
+	args := []string{
+		"--port", portStr,
+		"a2a",
+		"--a2a_agent_url", "http://0.0.0.0:" + portStr,
+	}
 
-
+	// Run launcher
+	if err := l.Execute(ctx, config, args); err != nil {
+		slog.Error("launcher.Run() error", "error", err)
+		os.Exit(1)
+	}
 }
