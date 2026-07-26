@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"google.golang.org/adk/tool"
+	"google.golang.org/adk/v2/agent"
 )
 
 func TestIsPrime(t *testing.T) {
@@ -53,8 +53,8 @@ func TestCheckPrimeTool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// checkPrimeTool doesn't use tool.Context, so we can pass nil
-			var tc tool.Context = nil
+			// checkPrimeTool doesn't use agent.Context, so we can pass nil
+			var tc agent.Context = nil
 			args := checkPrimeToolArgs{Num: tt.num}
 
 			got, err := checkPrimeTool(tc, args)

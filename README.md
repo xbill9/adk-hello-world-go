@@ -1,10 +1,18 @@
 # ADK Hello World (Go)
 
-Starter project for building AI agents with the [Go Agent Development Kit (ADK)](https://pkg.go.dev/google.golang.org/adk) and deploying them across multiple environments (local CLI, local web UI, Cloud Run), including an Agent-to-Agent (A2A) multi-agent demo.
+Starter project for building AI agents with the [Go Agent Development Kit (ADK 2.0)](https://github.com/google/adk-go) (`google.golang.org/adk/v2`) and deploying them across multiple environments (local CLI, local web UI, Cloud Run), including an Agent-to-Agent (A2A) multi-agent demo.
 
-**Versions:** Go ADK `v1.5.1` · Google GenAI SDK `v1.65.0` · Go `1.25`+ module directives (built with Go `1.26.3`)
+**Versions:** Go ADK 2.0 (`google.golang.org/adk/v2` `v2.1.0`) · Google GenAI SDK `v1.65.0` · Go `1.26.5` module directives (built with Go `1.26.3`)
 
 See [Building AI Agents with the GO ADK (v2)](<Building_AI_Agents_with_the_GO_Agent_Development_Kit_(ADK)_v2.md>) for the full tutorial.
+
+## Resources & Links
+
+* **Go ADK 2.0 GA Portal:** [https://adk.dev/2.0/](https://adk.dev/2.0/) (General Availability: June 30, 2026)
+* **Official Go ADK Repository:** [https://github.com/google/adk-go](https://github.com/google/adk-go)
+* **Go ADK 1.x Compatibility Guide:** [https://adk.dev/2.0/#adk-go-1x-compatibility](https://adk.dev/2.0/#adk-go-1x-compatibility)
+* **Go ADK 2.0 Package Documentation:** [pkg.go.dev/google.golang.org/adk/v2](https://pkg.go.dev/google.golang.org/adk/v2)
+* **Google GenAI SDK:** [github.com/googleapis/go-genai](https://github.com/googleapis/go-genai)
 
 ## Project Layout
 

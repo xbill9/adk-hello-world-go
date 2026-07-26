@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"google.golang.org/adk/agent"
+	"google.golang.org/adk/v2/agent"
 )
 
 // MockAgent embeds agent.Agent to satisfy the interface requirements

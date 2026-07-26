@@ -5,7 +5,7 @@
 ## Features
 
 *   **LLM Integration:** Utilizes the Gemini 2.5 Flash model for natural language understanding and generation.
-*   **Google ADK:** Built upon the Google Agent Development Kit for agent orchestration and management.
+*   **Google ADK:** Built upon the [Google Agent Development Kit (ADK 2.0)](https://github.com/google/adk-go) for agent orchestration and management.
 *   **Tool Usage:** Integrates with `geminitool.GoogleSearch` to retrieve real-time information.
 *   **Contextual Responses:** Provides current time information for specified cities.
 *   **Flexible Authentication:** Supports authentication via `GOOGLE_API_KEY` or Google Cloud's Vertex AI (default credentials).

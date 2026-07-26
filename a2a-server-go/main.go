@@ -21,14 +21,14 @@ import (
 	"os"
 	"os/signal"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/cmd/launcher"
-	"google.golang.org/adk/cmd/launcher/prod"
-	"google.golang.org/adk/model/gemini"
-	"google.golang.org/adk/session"
-	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
+	"google.golang.org/adk/v2/cmd/launcher"
+	"google.golang.org/adk/v2/cmd/launcher/prod"
+	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/genai"
 )
 
@@ -49,7 +49,7 @@ type checkPrimeToolArgs struct {
 	Num int `json:"num" jsonschema:"A number to check for primality."`
 }
 
-func checkPrimeTool(tc tool.Context, args checkPrimeToolArgs) (string, error) {
+func checkPrimeTool(ctx agent.Context, args checkPrimeToolArgs) (string, error) {
 	if isPrime(args.Num) {
 		return fmt.Sprintf("%d is a prime number.", args.Num), nil
 	}

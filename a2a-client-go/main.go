@@ -23,15 +23,15 @@ import (
 	"os/signal"
 	"strings"
 
-	"google.golang.org/adk/agent"
-	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/agent/remoteagent"
-	"google.golang.org/adk/artifact"
-	"google.golang.org/adk/model/gemini"
-	"google.golang.org/adk/runner"
-	"google.golang.org/adk/session"
-	"google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/agent/llmagent"
+	"google.golang.org/adk/v2/agent/remoteagent"
+	"google.golang.org/adk/v2/artifact"
+	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/adk/v2/runner"
+	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/functiontool"
 
 	"google.golang.org/genai"
 )
@@ -42,7 +42,7 @@ type rollDieToolArgs struct {
 	Sides int `json:"sides" jsonschema:"The number of sides on the die."`
 }
 
-func rollDieTool(tc tool.Context, args rollDieToolArgs) (int, error) {
+func rollDieTool(ctx agent.Context, args rollDieToolArgs) (int, error) {
 	if args.Sides <= 0 {
 		return 0, fmt.Errorf("number of sides must be greater than 0, got %d", args.Sides)
 	}

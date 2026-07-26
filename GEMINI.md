@@ -5,7 +5,7 @@ This document describes the project layout, common commands, and the best practi
 
 ## 1. Project Overview
 
-Starter project for building AI agents with the Go ADK (`google.golang.org/adk` **v1.5.1**, `google.golang.org/genai` **v1.65.0**) and deploying to Cloud Run. Toolchain: Go 1.26.x with `go 1.25.0` module directives.
+Starter project for building AI agents with the [Go ADK 2.0](https://github.com/google/adk-go) (`google.golang.org/adk/v2` **v2.1.0**, `google.golang.org/genai` **v1.65.0**; see [ADK 1.x Compatibility Guide](https://adk.dev/2.0/#adk-go-1x-compatibility)) and deploying to Cloud Run. Toolchain: Go 1.26.x with `go 1.26.5` module directives. (ADK 2.0 GA released June 30, 2026: https://adk.dev/2.0/)
 
 Five independent Go modules (each with its own `go.mod`, tests, and docs):
 

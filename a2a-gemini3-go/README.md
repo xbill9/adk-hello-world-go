@@ -1,12 +1,12 @@
 # a2a-gemini3-go
 
-`a2a-gemini3-go` is a sample Go application demonstrating how to build an AI agent using the [Agent Development Kit (ADK)](https://pkg.go.dev/google.golang.org/adk).
+`a2a-gemini3-go` is a sample Go application demonstrating how to build an AI agent using the [Google Agent Development Kit (ADK 2.0)](https://github.com/google/adk-go) (`google.golang.org/adk/v2`).
 
 This project creates a simple agent named `hello_time_agent` powered by Google's Gemini models. The agent is designed to tell the current time in a specified city, utilizing Google Search via the ADK's `geminitool` to fetch accurate information.
 
 ## Features
 
-*   **ADK Integration:** Showcases usage of `google.golang.org/adk` for agent creation and management.
+*   **ADK 2.0 Integration:** Showcases usage of `google.golang.org/adk/v2` for agent creation and management.
 *   **Gemini Powered:** Uses the `gemini-3-pro-preview` model by default (configurable).
 *   **Tool Use:** Equip the agent with `geminitool.GoogleSearch` to perform real-world queries.
 *   **Dual Authentication:** Supports both Google API Key and Google Cloud Vertex AI (ADC) authentication methods.

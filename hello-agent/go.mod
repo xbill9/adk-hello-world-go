@@ -1,9 +1,9 @@
 module hello-agent
 
-go 1.25.0
+go 1.26.5
 
 require (
-	google.golang.org/adk v1.5.1
+	google.golang.org/adk/v2 v2.1.0
 	google.golang.org/genai v1.65.0
 )
 
@@ -21,6 +21,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/safehtml v0.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
