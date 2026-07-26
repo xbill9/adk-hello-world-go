@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strconv"
 
 	"google.golang.org/adk/agent"
@@ -48,6 +49,9 @@ type rollDieToolArgs struct {
 }
 
 func rollDieTool(tc tool.Context, args rollDieToolArgs) (string, error) {
+	if args.Sides <= 0 {
+		return "", fmt.Errorf("number of sides must be greater than 0, got %d", args.Sides)
+	}
 	result := rand.Intn(args.Sides) + 1
 	return strconv.Itoa(result), nil
 }
@@ -79,10 +83,14 @@ func newRollAgent(ctx context.Context) (agent.Agent, error) {
 
 // --8<-- [start:new-prime-agent]
 func newPrimeAgent() (agent.Agent, error) {
+	primeAgentURL := os.Getenv("ADK_PRIME_AGENT_URL")
+	if primeAgentURL == "" {
+		primeAgentURL = "http://localhost:8086"
+	}
 	remoteAgent, err := remoteagent.NewA2A(remoteagent.A2AConfig{
 		Name:            PrimeAgentName,
 		Description:     "Agent that handles checking if a single integer is prime.",
-		AgentCardSource: "http://localhost:8086",
+		AgentCardSource: primeAgentURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote prime agent: %w", err)
@@ -117,8 +125,6 @@ func newRootAgent(ctx context.Context, rollAgent, primeAgent agent.Agent) (agent
 	})
 }
 
-
-
 // --8<-- [end:new-root-agent]
 
 // SingleAgentLoader is a simple implementation of agent.Loader for a single agent.
@@ -147,7 +153,8 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 
 	primeAgent, err := newPrimeAgent()
 	if err != nil {

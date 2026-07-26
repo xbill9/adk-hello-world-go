@@ -2,20 +2,32 @@ package main
 
 import (
 	"context"
+	"iter"
 	"testing"
 
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/model"
-	"iter"
+	"google.golang.org/genai"
 )
 
 // MockLLM is a mock implementation of the model.LLM interface for testing purposes.
-type MockLLM struct{}
+type MockLLM struct {
+	ResponseText string
+}
 
 func (m *MockLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
-		// For mocking, we can yield nothing, or a predefined response.
-		// For now, an empty sequence is fine as the tests are not concerned with the LLM's output.
+		if m.ResponseText != "" {
+			resp := &model.LLMResponse{
+				Content: &genai.Content{
+					Role: "model",
+					Parts: []*genai.Part{
+						{Text: m.ResponseText},
+					},
+				},
+			}
+			yield(resp, nil)
+		}
 	}
 }
 
@@ -24,10 +36,13 @@ func (m *MockLLM) Name() string {
 }
 
 func TestSingleAgentLoader_ListAgents(t *testing.T) {
-	mockAgent, _ := llmagent.New(llmagent.Config{
+	mockAgent, err := llmagent.New(llmagent.Config{
 		Name:  "test_agent",
 		Model: &MockLLM{},
 	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
 	loader := &singleAgentLoader{agent: mockAgent}
 
 	agents := loader.ListAgents()
@@ -40,10 +55,13 @@ func TestSingleAgentLoader_ListAgents(t *testing.T) {
 }
 
 func TestSingleAgentLoader_LoadAgent(t *testing.T) {
-	mockAgent, _ := llmagent.New(llmagent.Config{
+	mockAgent, err := llmagent.New(llmagent.Config{
 		Name:  "test_agent",
-		Model: &MockLLM{},
+		Model: &MockLLM{ResponseText: "Hello from Mock!"},
 	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
 	loader := &singleAgentLoader{agent: mockAgent}
 
 	// Test loading the correct agent
@@ -66,13 +84,25 @@ func TestSingleAgentLoader_LoadAgent(t *testing.T) {
 	if ag != nil {
 		t.Errorf("Expected nil for non-existent agent, got %v", ag)
 	}
+
+	// Test loading with empty string
+	ag, err = loader.LoadAgent("")
+	if err != nil {
+		t.Fatalf("Unexpected error loading empty string agent name: %v", err)
+	}
+	if ag != nil {
+		t.Errorf("Expected nil for empty string agent name, got %v", ag)
+	}
 }
 
 func TestSingleAgentLoader_RootAgent(t *testing.T) {
-	mockAgent, _ := llmagent.New(llmagent.Config{
+	mockAgent, err := llmagent.New(llmagent.Config{
 		Name:  "test_agent",
 		Model: &MockLLM{},
 	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
 	loader := &singleAgentLoader{agent: mockAgent}
 
 	rootAgent := loader.RootAgent()
@@ -81,5 +111,28 @@ func TestSingleAgentLoader_RootAgent(t *testing.T) {
 	}
 	if rootAgent.Name() != "test_agent" {
 		t.Errorf("Expected root agent name 'test_agent', got '%s'", rootAgent.Name())
+	}
+}
+
+func TestMockLLM_GenerateContent(t *testing.T) {
+	mock := &MockLLM{ResponseText: "Mock Response"}
+	if mock.Name() != "mock-model" {
+		t.Errorf("Expected model name 'mock-model', got '%s'", mock.Name())
+	}
+
+	ctx := context.Background()
+	req := &model.LLMRequest{}
+	var resultText string
+	for resp, err := range mock.GenerateContent(ctx, req, false) {
+		if err != nil {
+			t.Fatalf("Unexpected error during GenerateContent: %v", err)
+		}
+		if resp.Content != nil && len(resp.Content.Parts) > 0 {
+			resultText = resp.Content.Parts[0].Text
+		}
+	}
+
+	if resultText != "Mock Response" {
+		t.Errorf("Expected 'Mock Response', got '%s'", resultText)
 	}
 }

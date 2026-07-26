@@ -64,7 +64,19 @@ func run(ctx context.Context) error {
 		})
 	} else {
 		slog.Info("Using Vertex AI (default credentials) for authentication")
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{})
+		project := os.Getenv("GOOGLE_CLOUD_PROJECT")
+		if project == "" {
+			project = os.Getenv("PROJECT_ID")
+		}
+		location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+		if location == "" {
+			location = os.Getenv("REGION")
+		}
+		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+			Project:  project,
+			Location: location,
+			Backend:  genai.BackendVertexAI,
+		})
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create model: %w", err)

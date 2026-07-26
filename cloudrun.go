@@ -16,6 +16,7 @@
 package cloudrun
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -177,25 +178,29 @@ func (f *deployCloudRunFlags) prepareDockerfile() error {
 		func(p util.Printer) error {
 			p("Writing:", f.build.dockerfileBuildPath)
 
-			var b strings.Builder
-			b.WriteString(`
-FROM gcr.io/distroless/static-debian11
-
-COPY ` + f.build.execFile + `  /app/` + f.build.execFile + `
-EXPOSE ` + strconv.Itoa(flags.cloudRun.serverPort) + `
-# Command to run the executable when the container starts
-CMD ["/app/` + f.build.execFile + `", "web", "-port", "` + strconv.Itoa(flags.cloudRun.serverPort) + `"`)
-
+			cmdArgs := []string{"/app/" + f.build.execFile, "web", "-port", strconv.Itoa(flags.cloudRun.serverPort)}
 			if flags.cloudRun.api {
-				b.WriteString(`, "api", "-webui_address", "127.0.0.1:` + strconv.Itoa(f.proxy.port) + `"`)
+				cmdArgs = append(cmdArgs, "api", "-webui_address", "127.0.0.1:"+strconv.Itoa(f.proxy.port))
 			}
 			if flags.cloudRun.a2a {
-				b.WriteString(`, "a2a", "--a2a_agent_url", "` + flags.cloudRun.a2aAgentCardURL + `"`)
+				cmdArgs = append(cmdArgs, "a2a", "--a2a_agent_url", flags.cloudRun.a2aAgentCardURL)
 			}
 			if flags.cloudRun.webui {
-				b.WriteString(`, "webui", "--api_server_address", "http://127.0.0.1:` + strconv.Itoa(f.proxy.port) + `/api"]
-				`)
+				cmdArgs = append(cmdArgs, "webui", "--api_server_address", "http://127.0.0.1:"+strconv.Itoa(f.proxy.port)+"/api")
 			}
+
+			cmdJSON, err := json.Marshal(cmdArgs)
+			if err != nil {
+				return fmt.Errorf("failed to marshal CMD args: %w", err)
+			}
+
+			var b strings.Builder
+			b.WriteString("FROM gcr.io/distroless/static-debian11\n\n")
+			b.WriteString("COPY " + f.build.execFile + " /app/" + f.build.execFile + "\n")
+			b.WriteString("EXPOSE " + strconv.Itoa(flags.cloudRun.serverPort) + "\n")
+			b.WriteString("# Command to run the executable when the container starts\n")
+			b.WriteString("CMD " + string(cmdJSON) + "\n")
+
 			return os.WriteFile(f.build.dockerfileBuildPath, []byte(b.String()), 0600)
 		})
 }
@@ -241,8 +246,6 @@ func (f *deployCloudRunFlags) runGcloudProxy() error {
 
 // deployOnCloudRun executes the sequence of actions preparing and deploying the agent to CloudRun. Then runs authenticating proxy to newly deployed service
 func (f *deployCloudRunFlags) deployOnCloudRun() error {
-	fmt.Println(flags)
-
 	err := f.computeFlags()
 	if err != nil {
 		return err

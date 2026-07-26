@@ -91,34 +91,34 @@ func run(ctx context.Context) error {
 		SessionService: session.InMemoryService(),
 	}
 
-        	// Allow PORT to be set by the environment
-        	portStr := os.Getenv("PORT")
-        	if portStr == "" {
-        		portStr = "8095"
-        	}
-        
-        	port, err := strconv.Atoi(portStr)
-        	if err != nil {
-        		slog.Warn("Invalid PORT environment variable, defaulting to 8095", "error", err)
-        		port = 8095
-        	}
-        
-        	// Check if the port is available, if not find the next available one
-        	finalPort := findAvailablePort(port)
-        	if finalPort != port {
-        		slog.Info("Port was busy, switching to available port", "old_port", port, "new_port", finalPort)
-        		portStr = strconv.Itoa(finalPort)
-        	}
-        
-        	// Set PORT env var for the launcher to pick up
-        	os.Setenv("PORT", portStr)
+	// Allow PORT to be set by the environment
+	portStr := os.Getenv("PORT")
+	if portStr == "" {
+		portStr = "8095"
+	}
 
-       args := []string{
-                "web", // Launch web server
-                "--port", portStr,
-                "a2a", // Sublauncher for a2a functionality
-                "--a2a_agent_url", "http://0.0.0.0:" + portStr,
-        }
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		slog.Warn("Invalid PORT environment variable, defaulting to 8095", "error", err)
+		port = 8095
+	}
+
+	// Check if the port is available, if not find the next available one
+	finalPort := findAvailablePort(port)
+	if finalPort != port {
+		slog.Info("Port was busy, switching to available port", "old_port", port, "new_port", finalPort)
+		portStr = strconv.Itoa(finalPort)
+	}
+
+	// Set PORT env var for the launcher to pick up
+	os.Setenv("PORT", portStr)
+
+	args := []string{
+		"web", // Launch web server
+		"--port", portStr,
+		"a2a", // Sublauncher for a2a functionality
+		"--a2a_agent_url", "http://0.0.0.0:" + portStr,
+	}
 
 	l := prod.NewLauncher()
 	slog.Info("Starting launcher...")

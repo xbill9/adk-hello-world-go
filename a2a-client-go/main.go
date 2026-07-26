@@ -17,9 +17,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strings"
 
 	"google.golang.org/adk/agent"
@@ -42,6 +43,9 @@ type rollDieToolArgs struct {
 }
 
 func rollDieTool(tc tool.Context, args rollDieToolArgs) (int, error) {
+	if args.Sides <= 0 {
+		return 0, fmt.Errorf("number of sides must be greater than 0, got %d", args.Sides)
+	}
 	return rand.Intn(args.Sides) + 1, nil
 }
 
@@ -115,7 +119,11 @@ func newRootAgent(ctx context.Context, modelName string, rollAgent, primeAgent a
 // --- Main Function ---
 
 func main() {
-	ctx := context.Background()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 
 	modelName := os.Getenv("ADK_MODEL_NAME")
 	if modelName == "" {
@@ -139,17 +147,20 @@ func main() {
 
 	primeAgent, err := newPrimeAgent(primeAgentURL)
 	if err != nil {
-		log.Fatalf("Failed to create prime agent: %v", err)
+		slog.Error("Failed to create prime agent", "error", err)
+		os.Exit(1)
 	}
 
 	rollAgent, err := newRollAgent(ctx, modelName)
 	if err != nil {
-		log.Fatalf("Failed to create roll agent: %v", err)
+		slog.Error("Failed to create roll agent", "error", err)
+		os.Exit(1)
 	}
 
 	rootAgent, err := newRootAgent(ctx, modelName, rollAgent, primeAgent)
 	if err != nil {
-		log.Fatalf("Failed to create root agent: %v", err)
+		slog.Error("Failed to create root agent", "error", err)
+		os.Exit(1)
 	}
 
 	sessionService := session.InMemoryService()
@@ -161,7 +172,8 @@ func main() {
 		SessionID: sessionID,
 	})
 	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
+		slog.Error("Failed to create session", "error", err)
+		os.Exit(1)
 	}
 
 	runnerConfig := runner.Config{
@@ -172,7 +184,8 @@ func main() {
 	}
 	runner, err := runner.New(runnerConfig)
 	if err != nil {
-		log.Fatalf("Failed to create runner: %v", err)
+		slog.Error("Failed to create runner", "error", err)
+		os.Exit(1)
 	}
 
 	var userInput string
@@ -188,7 +201,7 @@ func main() {
 		StreamingMode: agent.StreamingModeNone,
 	}) {
 		if err != nil {
-			log.Printf("Agent run error: %v", err)
+			slog.Error("Agent run error", "error", err)
 			continue
 		}
 		if event.Content != nil {

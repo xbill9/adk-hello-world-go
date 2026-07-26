@@ -3,62 +3,80 @@
 # Variables
 SERVICE_NAME := adk-hello-world-go
 REGION := us-central1
-PROJECT_ID := $(shell gcloud config get-value project) # Cache project ID
-APP_DIR := hello-agent
+PROJECT_ID := $(shell gcloud config get-value project 2>/dev/null) # Cache project ID
+MODULES := hello-agent a2a-client-go a2a-gemini3-go a2a-master-go a2a-server-go
 
 .PHONY: all build run clean release test format check-fmt lint check deps doc docker-build deploy help
 
 # The default target
 all: build
 
-# Build the project for development
+# Build all submodules for development
 build:
-	@echo "Building the Go project..."
-	@cd $(APP_DIR) && go get -u ./... && go mod tidy
-	@cd $(APP_DIR) && go build .
+	@echo "Building Go submodules..."
+	@for mod in $(MODULES); do \
+		echo "Building $$mod..."; \
+		(cd $$mod && go build .) || exit 1; \
+	done
 
-# Run the project
+# Run the default project (hello-agent)
 run:
-	@echo "Running the Go project..."
-	@cd $(APP_DIR) &&  go run agent.go
+	@echo "Running hello-agent..."
+	@cd hello-agent && go run agent.go
 
-# Clean the project
+# Clean all submodules
 clean:
-	@echo "Cleaning the project..."
-	@cd $(APP_DIR) && go clean
+	@echo "Cleaning submodules..."
+	@for mod in $(MODULES); do \
+		(cd $$mod && go clean); \
+	done
 
 # Build the project for release
 release:
 	@echo "Building Release..."
-	@cd $(APP_DIR) && CGO_ENABLED=0 GOOS=linux go build -v -o $(SERVICE_NAME) .
+	@cd hello-agent && CGO_ENABLED=0 GOOS=linux go build -v -o $(SERVICE_NAME) .
 
-# Run tests
+# Run tests across all submodules
 test:
-	@echo "Running tests..."
-	@cd $(APP_DIR) && go test -v ./...
+	@echo "Running tests across all submodules..."
+	@for mod in $(MODULES); do \
+		echo "Testing $$mod..."; \
+		(cd $$mod && go test -v ./...) || exit 1; \
+	done
 
-# Format the code
+# Format the code across all submodules
 format:
 	@echo "Formatting code..."
-	@gofmt -w $(APP_DIR)
+	@for mod in $(MODULES); do \
+		(cd $$mod && go fmt ./...); \
+	done
+	@go fmt cloudrun.go
 
-# Check formatting
+# Check formatting across all submodules
 check-fmt:
 	@echo "Checking formatting..."
-	@test -z $(shell gofmt -l $(APP_DIR)) || (echo "gofmt found files that need formatting"; exit 1)
+	@for mod in $(MODULES); do \
+		(cd $$mod && go fmt ./...); \
+	done
 
-# Lint the code
+# Lint the code across all submodules
 lint:
-	@echo "Linting code..."
-	@cd $(APP_DIR) && go vet ./...
+	@echo "Linting code across all submodules..."
+	@for mod in $(MODULES); do \
+		echo "Linting $$mod..."; \
+		(cd $$mod && go vet ./...) || exit 1; \
+	done
 
 # Check the code
 check: lint
 
-# Update dependencies
+# Update dependencies across all submodules
 deps:
 	@echo "Updating dependencies..."
-	@cd $(APP_DIR) && go get -u ./... && go mod tidy
+	@for mod in $(MODULES); do \
+		echo "Updating $$mod dependencies..."; \
+		(cd $$mod && go get -u ./... && go mod tidy) || exit 1; \
+	done
 
 # Generate documentation
 doc:
