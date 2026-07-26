@@ -27,6 +27,10 @@ const (
 )
 
 func main() {
+	// Configure structured logging (JSON) for Cloud Logging compatibility.
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	slog.SetDefault(logger)
+
 	// Handle signal interrupts (Ctrl+C) gracefully.
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -52,17 +56,17 @@ func run(ctx context.Context) error {
 
 	slog.Info("Initializing model", "model", modelName)
 
-	var model model.LLM
+	var llm model.LLM
 	var err error
 	// use API KEY if set but otherwise Vertex AI
 	if apiKey != "" {
 		slog.Info("Using Google API Key for authentication")
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+		llm, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			APIKey: apiKey,
 		})
 	} else {
 		slog.Info("Using Vertex AI (default credentials) for authentication")
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+		llm, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			Project:  os.Getenv("GOOGLE_CLOUD_PROJECT"),
 			Location: os.Getenv("GOOGLE_CLOUD_LOCATION"),
 			Backend:  genai.BackendVertexAI,
@@ -74,7 +78,7 @@ func run(ctx context.Context) error {
 
 	ag, err := llmagent.New(llmagent.Config{
 		Name:        agentName,
-		Model:       model,
+		Model:       llm,
 		Description: "Tells the current time in a specified city by searching on Google.",
 		Instruction: "You are a helpful assistant that tells the current time in a city using Google Search. You cannot set the time.",
 		Tools: []tool.Tool{
@@ -110,9 +114,6 @@ func run(ctx context.Context) error {
 		portStr = strconv.Itoa(finalPort)
 	}
 
-	// Set PORT env var for the launcher to pick up
-	os.Setenv("PORT", portStr)
-
 	args := []string{
 		"web", // Launch web server
 		"--port", portStr,
@@ -147,7 +148,7 @@ func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
 	if name == s.agent.Name() {
 		return s.agent, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("agent not found: %s", name)
 }
 
 // RootAgent returns the default or root agent for this loader.
@@ -157,6 +158,8 @@ func (s *singleAgentLoader) RootAgent() agent.Agent {
 
 // findAvailablePort attempts to find an available port starting from the given port.
 // It returns the first available port it finds, or the original port if checking fails.
+// There is an inherent race between checking a port here and the launcher binding it
+// later; that is acceptable for local development use.
 func findAvailablePort(startPort int) int {
 	for port := startPort; port < startPort+100; port++ {
 		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

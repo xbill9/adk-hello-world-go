@@ -48,8 +48,8 @@ func TestSingleAgentLoader_LoadAgent(t *testing.T) {
 
 	// Test non-matching name
 	ag, err = loader.LoadAgent("other-agent")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for non-matching name, got nil")
 	}
 	if ag != nil {
 		t.Errorf("expected nil agent, got %v", ag)

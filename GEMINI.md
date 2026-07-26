@@ -1,72 +1,69 @@
 # Gemini Workspace for `adk-hello-world-go`
 
-You are a GO Developer working with Google Cloud.
-This document outlines best practices for developing Go applications, especially when using the Go ADK and deploying to Google Cloud. Adhering to these guidelines will ensure your code is maintainable, performant, and secure.
+You are a Go developer working with Google Cloud and the Go Agent Development Kit (ADK).
+This document describes the project layout, common commands, and the best practices to follow when modifying this repository.
 
-## 1. General Go Best Practices
+## 1. Project Overview
 
-### 1.1 Error Handling
-*   **Explicit Error Checks:** Always check errors explicitly. Don't ignore them.
-*   **Error Wrapping:** Use `fmt.Errorf` with `%w` to wrap errors, preserving the original error context. This allows for programmatic inspection of error chains.
-*   **Custom Error Types:** Define custom error types for specific error conditions to provide more context and allow for type-based error handling.
-*   **Contextual Errors:** Add sufficient context to error messages to aid debugging.
+Starter project for building AI agents with the Go ADK (`google.golang.org/adk` **v1.5.1**, `google.golang.org/genai` **v1.65.0**) and deploying to Cloud Run. Toolchain: Go 1.26.x with `go 1.25.0` module directives.
 
-### 1.2 Concurrency (Goroutines and Channels)
-*   **Use Goroutines for Parallelism:** Leverage goroutines for tasks that can run concurrently.
-*   **Communicate with Channels:** Use channels to safely communicate and synchronize data between goroutines, avoiding shared memory issues.
-*   **Avoid Naked Goroutines:** Ensure goroutines are properly managed (e.g., using `sync.WaitGroup` or context cancellation) to prevent leaks or unexpected behavior.
-*   **Context for Cancellation/Timeouts:** Use `context.Context` to manage cancellation signals and timeouts across goroutine hierarchies.
+Five independent Go modules (each with its own `go.mod`, tests, and docs):
 
-### 1.3 Code Structure and Modularity
-*   **Clear Package Structure:** Organize code into logical packages. Each package should have a single, clear responsibility.
-*   **Small Functions:** Keep functions small and focused on a single task.
-*   **Modules for Dependency Management:** Use Go Modules for managing dependencies.
-*   **Internal Packages:** Use `internal` packages for code that should not be imported by other modules.
+- `hello-agent/` — `hello_time_agent`: tells the time in a city via Google Search; main deployment target (`agent.go`).
+- `a2a-server-go/` — A2A server exposing `check_prime_agent` with a `functiontool` prime checker (port 8086).
+- `a2a-master-go/` — root agent served over A2A (port 8092) delegating to a local `roll_agent` and the remote `prime_agent`.
+- `a2a-client-go/` — CLI runner for the same agent tree; prompt comes from `os.Args`.
+- `a2a-gemini3-go/` — hello-agent variant on `gemini-3-pro-preview` with port-fallback logic (port 8095).
 
-### 1.4 Naming Conventions
-*   **Descriptive Names:** Use clear, descriptive names for variables, functions, and types.
-*   **CamelCase for Exported Names:** Exported (public) names start with a capital letter. Unexported (private) names start with a lowercase letter.
-*   **Short Variable Names for Local Scope:** Use shorter, concise names for variables with small scopes (e.g., `i` for loop counters, `err` for errors).
+Root-level files: `cloudrun.go` (reference `adkgo deploy cloudrun` subcommand, built against ADK internals — not buildable standalone here), `Dockerfile` (multi-stage distroless build of hello-agent), `cloudbuild.yaml`, `Makefile`, and setup/run shell scripts (`init.sh`, `set_env.sh`, `cli.sh`, `web.sh`, `run-a2a-*.sh`, `cloudrun.sh`).
 
-### 1.5 Testing
-*   **Write Unit Tests:** Create unit tests for all critical logic.
-*   **Table-Driven Tests:** Use table-driven tests for multiple test cases with similar logic.
-*   **Benchmarking:** Write benchmarks for performance-critical code.
-*   **Test Coverage:** Aim for good test coverage, but prioritize meaningful tests over 100% coverage.
+## 2. Common Commands
 
-### 1.6 Documentation
-*   **Godoc:** Document all exported functions, types, and variables using Godoc comments.
-*   **README.md:** Maintain a comprehensive `README.md` for project overview, setup, and usage.
+```bash
+make build     # go build all five modules
+make test      # go test -v all five modules — run after every change
+make lint      # go vet all five modules
+make format    # go fmt all five modules
+make deps      # go get -u && go mod tidy per module
+make deploy    # gcloud builds submit (cloudbuild.yaml)
+```
 
-## 2. Go ADK Specific Best Practices
+Local run: `./cli.sh` (CLI), `./web.sh` (web UI on :8080). A2A demo: `./run-a2a-server-go.sh` then `./run-a2a-master-go.sh`.
 
-When working with the Go ADK, consider the following:
+## 3. Established Patterns in This Repo
 
-### 2.1 ADK Integration
-*   **Utilize ADK Libraries:** Leverage the provided ADK libraries and utilities for common tasks (e.g., authentication, configuration, service interaction).
-*   **Follow ADK Patterns:** Adhere to any specific patterns or interfaces defined by the ADK to ensure seamless integration and future compatibility.
-*   **Configuration Management:** Use ADK's recommended methods for managing application configuration, especially for environment-specific settings.
+Follow these existing conventions when adding or modifying code:
 
-### 2.2 Google Cloud Deployment Considerations
+- **Structured logging with `log/slog`:** every entrypoint installs `slog.New(slog.NewJSONHandler(...))` as the default logger for Cloud Logging compatibility. Do not introduce `zap`, `logrus`, or bare `fmt.Println` logging.
+- **Graceful shutdown:** entrypoints derive their context from `signal.NotifyContext(context.Background(), os.Interrupt)` and pass it through to models, runners, and launchers.
+- **Auth fallback:** models prefer `GOOGLE_API_KEY` (Gemini API) and fall back to Vertex AI (`genai.BackendVertexAI`) with `GOOGLE_CLOUD_PROJECT`/`GOOGLE_CLOUD_LOCATION` and Application Default Credentials.
+- **Tools via `functiontool.New`:** typed args structs with `json` + `jsonschema` tags; validate inputs and return errors rather than panicking (see `rollDieTool`'s `sides <= 0` check).
+- **Agent loaders:** single-agent programs adapt their agent to the ADK `AgentLoader` interface with a small `SingleAgentLoader` type; `LoadAgent` should return an error (not `nil, nil`) for unknown names.
+- **Launchers:** `full.NewLauncher()` for the dev experience (web/api/webui subcommands), `prod.NewLauncher()` for A2A servers. Port comes from `PORT` env var with a per-module default.
 
-### 2.2.1 Logging and Monitoring
-*   **Structured Logging:** Use structured logging (e.g., JSON format) with libraries like `zap` or `logrus` to make logs easily parsable by Google Cloud Logging.
-*   **Contextual Logging:** Include relevant context (e.g., request IDs, user IDs) in log entries.
-*   **Cloud Monitoring:** Integrate with Google Cloud Monitoring (formerly Stackdriver) for metrics and alerts. Use OpenCensus or OpenTelemetry for tracing and custom metrics.
+## 4. General Go Best Practices
 
-### 2.2.2 Security
-*   **Least Privilege:** Grant only the necessary IAM permissions to your service accounts.
-*   **Secret Management:** Use Google Secret Manager for sensitive information (API keys, database credentials) instead of hardcoding them or storing them in environment variables directly.
-*   **Vulnerability Scanning:** Regularly scan your dependencies for known vulnerabilities.
+### 4.1 Error Handling
+- Always check errors explicitly; wrap with `fmt.Errorf("...: %w", err)` to preserve the chain.
+- Add enough context to error messages to aid debugging (what was attempted, with which inputs).
 
-### 2.2.3 Cost Optimization
-*   **Resource Sizing:** Right-size your Cloud Run instances or GKE pods to avoid over-provisioning.
-*   **Autoscaling:** Configure autoscaling where appropriate to scale resources up and down based on demand.
-*   **Serverless First:** Prefer serverless options like Cloud Run or Cloud Functions for event-driven or stateless workloads to minimize operational overhead and cost.
+### 4.2 Concurrency
+- Manage goroutines with `sync.WaitGroup` or context cancellation — no naked goroutines.
+- Use `context.Context` for cancellation and timeouts across call hierarchies.
 
-### 2.2.4 Deployment
-*   **Containerization:** Use Docker to containerize your Go applications for consistent deployment across environments.
-*   **Cloud Build:** Automate your build and deployment pipelines using Google Cloud Build.
-*   **Health Checks:** Implement health checks (`/healthz`, `/readyz`) for services deployed on platforms like Cloud Run or GKE.
+### 4.3 Structure and Naming
+- One clear responsibility per package; keep functions small.
+- Exported identifiers use CamelCase and carry Godoc comments; short names (`i`, `err`, `tc`) are fine in small scopes.
 
-By following these best practices, you can develop robust, efficient, and scalable Go applications within the Google Cloud ecosystem using the Go ADK.
+### 4.4 Testing
+- Use table-driven tests (see `a2a-server-go/main_test.go` for the house style).
+- Test pure logic (tool functions, helpers) without requiring network or credentials.
+- Run `make test` and `make lint` before committing; all must pass.
+
+## 5. Google Cloud Deployment
+
+- **Containerization:** multi-stage Docker builds ending on `gcr.io/distroless/static-debian11`; build with `CGO_ENABLED=0 GOOS=linux`.
+- **Cloud Run:** deploy with `--no-allow-unauthenticated` and access via `gcloud run services proxy` (see `proxy.sh`); right-size instances and rely on autoscaling.
+- **Secrets:** use Secret Manager for API keys and credentials; never commit keys or bake them into images. Grant service accounts least-privilege IAM roles.
+- **Observability:** JSON logs flow to Cloud Logging automatically; use OpenTelemetry (already an ADK dependency) for tracing and custom metrics.
+- **Builds:** automate with Cloud Build (`cloudbuild.yaml`); keep the substitution `_SERVICE_NAME` in sync with the Makefile's `SERVICE_NAME`.

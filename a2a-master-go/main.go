@@ -174,18 +174,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	sessionService := session.InMemoryService()
-
-	_, err = sessionService.Create(ctx, &session.CreateRequest{
-		AppName:   rootAgent.Name(),
-		UserID:    "user-123",
-		SessionID: "session-abc",
-	})
-	if err != nil {
-		slog.Error("Failed to create session", "error", err)
-		os.Exit(1)
-	}
-
 	// Create launcher.
 	l := prod.NewLauncher()
 
@@ -194,16 +182,14 @@ func main() {
 	if portStr == "" {
 		portStr = "8092"
 	}
-	// Set PORT env var for the launcher to pick up
-	os.Setenv("PORT", portStr)
 
 	// Create ADK config
 	config := &launcher.Config{
 		AgentLoader:    &SingleAgentLoader{Agent: rootAgent},
-		SessionService: sessionService,
+		SessionService: session.InMemoryService(),
 	}
 
-	slog.Info("Starting A2A prime checker server", "port", portStr)
+	slog.Info("Starting A2A root agent server", "port", portStr)
 
 	// Arguments for the launcher.
 	args := []string{

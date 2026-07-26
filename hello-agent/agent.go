@@ -54,12 +54,12 @@ func run(ctx context.Context) error {
 
 	slog.Info("Initializing model", "model", modelName)
 
-	var model model.LLM
+	var llm model.LLM
 	var err error
 	// use API KEY if set but otherwise Vertex AI
 	if apiKey != "" {
 		slog.Info("Using Google API Key for authentication")
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+		llm, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			APIKey: apiKey,
 		})
 	} else {
@@ -72,7 +72,7 @@ func run(ctx context.Context) error {
 		if location == "" {
 			location = os.Getenv("REGION")
 		}
-		model, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
+		llm, err = gemini.NewModel(ctx, modelName, &genai.ClientConfig{
 			Project:  project,
 			Location: location,
 			Backend:  genai.BackendVertexAI,
@@ -84,7 +84,7 @@ func run(ctx context.Context) error {
 
 	ag, err := llmagent.New(llmagent.Config{
 		Name:        agentName,
-		Model:       model,
+		Model:       llm,
 		Description: "Tells the current time in a specified city.",
 		Instruction: "You are a helpful assistant that tells the current time in a city.",
 		Tools: []tool.Tool{
@@ -123,7 +123,7 @@ func (s *singleAgentLoader) LoadAgent(name string) (agent.Agent, error) {
 	if name == s.agent.Name() {
 		return s.agent, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("agent not found: %s", name)
 }
 
 func (s *singleAgentLoader) RootAgent() agent.Agent {

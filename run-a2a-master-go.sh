@@ -3,5 +3,5 @@ source $HOME/adk-hello-world-go/set_env.sh
 cd a2a-master-go
 
 echo `pwd`
-echo go run agent.go web api webui
-go run main.go web api webui
+echo go run main.go
+go run main.go

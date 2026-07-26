@@ -38,8 +38,9 @@ if [[ "$use_gemini_key" == "y" || "$use_gemini_key" == "Y" ]]; then
     KEY_FILE="$HOME/gemini.key"
 
     echo "--- Setting Google Cloud Gemini Key File ---"
-    # Prompt the user for input
-    read -p "Please enter your Google Cloud Gemini Key: " user_gemini_key
+    # Prompt the user for input (silent, so the key is not shown on screen)
+    read -s -p "Please enter your Google Cloud Gemini Key: " user_gemini_key
+    echo
 
     # Check if the user entered anything
     if [[ -z "$user_gemini_key" ]]; then
@@ -47,17 +48,16 @@ if [[ "$use_gemini_key" == "y" || "$use_gemini_key" == "Y" ]]; then
       exit 1 # Exit the script with an error code
     fi
 
-    echo "You entered: $user_gemini_key"
-
-    # Write the project ID to the file
+    # Write the key to the file, readable only by the current user
     # Using > will overwrite the file if it exists
-    echo "$user_gemini_key" > "$KEY_FILE"
+    (umask 077 && echo "$user_gemini_key" > "$KEY_FILE")
 
     # Check if the write operation was successful
     if [[ $? -eq 0 ]]; then
+      chmod 600 "$KEY_FILE"
       echo "Successfully saved Gemini Key."
     else
-      echo "Error: Failed saving your Gemini Key:  $user_gemini_key."
+      echo "Error: Failed saving your Gemini Key."
       exit 1
     fi
 

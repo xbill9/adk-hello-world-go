@@ -38,8 +38,9 @@ fi
 
 
 
-# 2. Set the default gcloud project configuration
+# 2. Set the default gcloud project configuration from the project file
 PROJECT_ID_FROM_FILE=$(cat "$PROJECT_FILE_PATH")
+gcloud config set project "$PROJECT_ID_FROM_FILE" --quiet
 
 # 3. Export PROJECT_ID (Get from config to confirm it was set correctly)
 export PROJECT_ID=$(gcloud config get project)
@@ -65,10 +66,6 @@ echo "Exported GOOGLE_GENAI_USE_VERTEXAI=$GOOGLE_GENAI_USE_VERTEXAI"
 #  Export GOOGLE_CLOUD_LOCATION
 export GOOGLE_CLOUD_LOCATION="$GOOGLE_CLOUD_LOCATION"
 echo "Exported GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION"
-
-#  Export REPO_NAME
-export REPO_NAME="$REPO_NAME"
-echo "Exported REPO_NAME=$REPO_NAME"
 
 #  Export REGION
 export REGION="$GOOGLE_CLOUD_LOCATION"

@@ -86,7 +86,7 @@ func main() {
 
 	primeTool, err := functiontool.New(functiontool.Config{
 		Name:        "prime_checking",
-		Description: "Check if a number is prime using efficient mathematical algorithms",
+		Description: "Check if a number is prime",
 	}, checkPrimeTool)
 	if err != nil {
 		slog.Error("Failed to create prime_checking tool", "error", err)
@@ -123,8 +123,6 @@ func main() {
 	if portStr == "" {
 		portStr = "8086"
 	}
-	// Set PORT env var for the launcher to pick up
-	os.Setenv("PORT", portStr)
 
 	// Create ADK config
 	config := &launcher.Config{
@@ -135,9 +133,6 @@ func main() {
 	slog.Info("Starting A2A prime checker server", "port", portStr)
 
 	// Arguments for the launcher.
-	// Note: ParseAndRun usually expects the first argument to be the program name if it parses full os.Args,
-	// but here we are constructing args manually.
-	// If full launcher uses standard flag parsing, it might expect the command "a2a" as a subcommand.
 	args := []string{
 		"--port", portStr,
 		"a2a",

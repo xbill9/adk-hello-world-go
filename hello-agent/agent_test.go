@@ -78,8 +78,8 @@ func TestSingleAgentLoader_LoadAgent(t *testing.T) {
 
 	// Test loading a non-existent agent
 	ag, err = loader.LoadAgent("non_existent_agent")
-	if err != nil {
-		t.Fatalf("Unexpected error loading non-existent agent: %v", err)
+	if err == nil {
+		t.Fatal("Expected error loading non-existent agent, got nil")
 	}
 	if ag != nil {
 		t.Errorf("Expected nil for non-existent agent, got %v", ag)
@@ -87,8 +87,8 @@ func TestSingleAgentLoader_LoadAgent(t *testing.T) {
 
 	// Test loading with empty string
 	ag, err = loader.LoadAgent("")
-	if err != nil {
-		t.Fatalf("Unexpected error loading empty string agent name: %v", err)
+	if err == nil {
+		t.Fatal("Expected error loading empty string agent name, got nil")
 	}
 	if ag != nil {
 		t.Errorf("Expected nil for empty string agent name, got %v", ag)
